@@ -35,6 +35,7 @@ class ExoplanetDataLoader:
             'koi_dicco_fsky_err1', 'koi_dicco_fsky_err2'
         ]
 
+        # Use only the essential feature columns we're downloading
         self.feature_columns = [
             'koi_period', 'koi_impact', 'koi_duration', 'koi_depth',
             'koi_prad', 'koi_teq', 'koi_insol', 'koi_model_snr',
@@ -44,33 +45,57 @@ class ExoplanetDataLoader:
 
     def download_koi_data(self, save_path='data/koi_cumulative.csv'):
         """Download KOI cumulative data from NASA Exoplanet Archive"""
-        base_url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+        # Using the direct table access URL instead of TAP
+        base_url = "https://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI"
 
-        columns_str = ','.join(self.koi_columns)
-        query = f"SELECT {columns_str} FROM koi WHERE koi_pdisposition IS NOT NULL"
+        # Request only essential columns to avoid issues
+        essential_columns = [
+            'kepoi_name', 'koi_disposition', 'koi_pdisposition', 'koi_score',
+            'koi_period', 'koi_impact', 'koi_duration', 'koi_depth',
+            'koi_prad', 'koi_teq', 'koi_insol', 'koi_model_snr',
+            'koi_steff', 'koi_slogg', 'koi_srad', 'koi_kepmag',
+            'koi_fpflag_nt', 'koi_fpflag_ss', 'koi_fpflag_co', 'koi_fpflag_ec'
+        ]
 
         params = {
-            'query': query,
-            'format': 'csv'
+            'table': 'cumulative',
+            'format': 'csv',
+            'select': ','.join(essential_columns)
         }
 
-        print(f"Downloading KOI data...")
-        response = requests.get(base_url, params=params)
+        print(f"Downloading KOI data from NASA Exoplanet Archive...")
+        try:
+            response = requests.get(base_url, params=params, timeout=60)
 
-        if response.status_code == 200:
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            with open(save_path, 'w') as f:
-                f.write(response.text)
-            print(f"Data saved to {save_path}")
-            return pd.read_csv(StringIO(response.text))
-        else:
-            print(f"Error downloading data: {response.status_code}")
+            if response.status_code == 200:
+                # Save the raw data
+                os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
+                with open(save_path, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                print(f"Data saved to {save_path}")
+
+                # Parse and return
+                df = pd.read_csv(StringIO(response.text), comment='#')
+                print(f"Loaded {len(df)} KOI objects")
+                return df
+            else:
+                print(f"Error downloading data: {response.status_code}")
+                print(f"Response: {response.text[:500]}")
+                return None
+
+        except Exception as e:
+            print(f"Error downloading data: {e}")
             return None
 
     def load_local_koi_data(self, file_path='data/koi_cumulative.csv'):
         """Load KOI data from local file"""
         if os.path.exists(file_path):
-            return pd.read_csv(file_path)
+            try:
+                # Try to read with comment parameter in case of header comments
+                return pd.read_csv(file_path, comment='#')
+            except:
+                # If that fails, try regular read
+                return pd.read_csv(file_path)
         else:
             print(f"File not found at {file_path}. Downloading...")
             return self.download_koi_data(file_path)
