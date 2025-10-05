@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_DIR=models_enhanced
+      - MAX_WORKERS=4
+    volumes:
+      - ./models:/app/models
+      - ./models_enhanced:/app/models_enhanced
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Optional: Add Redis for caching predictions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:

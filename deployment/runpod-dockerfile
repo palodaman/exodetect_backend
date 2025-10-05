@@ -1,0 +1,45 @@
+# RunPod GPU-optimized Docker image
+FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+COPY requirements-api.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# Install additional GPU-accelerated libraries
+RUN pip install --no-cache-dir \
+    cupy-cuda11x \
+    rapids-singlecell
+
+# Copy application code
+COPY *.py ./
+COPY models/ ./models/
+COPY models_enhanced/ ./models_enhanced/
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# RunPod Handler
+COPY runpod_handler.py .
+
+# Expose port
+EXPOSE 8000
+
+# Environment variables for GPU
+ENV CUDA_VISIBLE_DEVICES=0
+ENV OMP_NUM_THREADS=4
+
+# Run the application
+CMD ["python", "runpod_handler.py"]

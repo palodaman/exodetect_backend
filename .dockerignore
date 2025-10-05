@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+*.egg-info/
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# Data files (except models)
+data/*.csv
+data/*.txt
+*.csv
+*.txt
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend (don't include in backend image)
+exodetect/
+node_modules/
+
+# Deployment configs (except railway)
+runpod*
+*.toml
+
+# Test files
+test_*.py
+*_test.py
+demo_*.json
+
+# Results (can be regenerated)
+results/
+
+# Keep models and necessary files
+!models/
+!models_enhanced/
+!requirements*.txt
