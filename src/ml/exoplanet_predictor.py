@@ -36,9 +36,20 @@ class ExoplanetPredictor:
         feature_names_path = f"{self.model_dir}/feature_names.json"
 
         if not os.path.exists(model_path):
-            available_models = [f.replace('_model.pkl', '')
-                              for f in os.listdir(self.model_dir)
-                              if f.endswith('_model.pkl')]
+            # Debug output
+            print(f"❌ Model not found at: {model_path}")
+            print(f"   Model dir exists: {os.path.exists(self.model_dir)}")
+            print(f"   Working directory: {os.getcwd()}")
+            print(f"   __file__ location: {__file__}")
+            print(f"   Backend root: {os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))}")
+
+            # List available models if directory exists
+            available_models = []
+            if os.path.exists(self.model_dir):
+                available_models = [f.replace('_model.pkl', '')
+                                  for f in os.listdir(self.model_dir)
+                                  if f.endswith('_model.pkl')]
+
             raise ValueError(f"Model {self.model_name} not found. Available: {available_models}")
 
         self.model = joblib.load(model_path)
