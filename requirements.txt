@@ -8,6 +8,11 @@ seaborn
 joblib
 requests
 astropy
+astroquery
 scipy
 imbalanced-learn
 shap
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart

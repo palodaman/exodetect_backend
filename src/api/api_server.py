@@ -17,6 +17,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ml.exoplanet_predictor import ExoplanetPredictor
 from ml.light_curve_processor import LightCurveProcessor
+from utils.archive_fetcher import ArchiveFetcher
 
 app = FastAPI(
     title="ExoDetect API",
@@ -36,14 +37,22 @@ app.add_middleware(
 # Thread pool for CPU-intensive tasks
 executor = ThreadPoolExecutor(max_workers=4)
 
-# Initialize predictors (lazy loading)
+# Initialize predictors and archive fetcher (lazy loading)
 predictors = {}
+archive_fetcher = None
 
 def get_predictor(model_name="xgboost_enhanced"):
     """Get or create predictor instance"""
     if model_name not in predictors:
         predictors[model_name] = ExoplanetPredictor(model_name=model_name)
     return predictors[model_name]
+
+def get_archive_fetcher():
+    """Get or create archive fetcher instance"""
+    global archive_fetcher
+    if archive_fetcher is None:
+        archive_fetcher = ArchiveFetcher()
+    return archive_fetcher
 
 
 # Request/Response Models
@@ -307,19 +316,123 @@ async def predict_from_upload(
 
 @app.post("/api/predict/archive", response_model=PredictionResponse)
 async def predict_from_archive(query: ArchiveQuery, model_name: str = "xgboost_enhanced"):
-    """Predict from archive object (KOI/TOI)"""
+    """Predict from archive object (KOI/TOI/KIC/TIC/EPIC)"""
     start_time = datetime.now()
 
     try:
-        # This would fetch from NASA archive
-        # For now, return example response
-        raise HTTPException(
-            status_code=501,
-            detail="Archive integration pending. Use /api/predict/features instead."
+        predictor = get_predictor(model_name)
+        fetcher = get_archive_fetcher()
+
+        # Fetch archive data
+        loop = asyncio.get_event_loop()
+
+        # Determine if this is a KOI or TOI
+        identifier_upper = query.identifier.upper()
+        archive_data = None
+
+        if 'KOI' in identifier_upper or 'K' == identifier_upper[0]:
+            # Fetch KOI data
+            archive_data = await loop.run_in_executor(
+                executor,
+                fetcher.fetch_koi_data,
+                query.identifier
+            )
+        elif 'TOI' in identifier_upper:
+            # Fetch TOI data
+            archive_data = await loop.run_in_executor(
+                executor,
+                fetcher.fetch_toi_data,
+                query.identifier
+            )
+        else:
+            # Generic identifier (KIC, TIC, EPIC)
+            archive_data = {"identifier": query.identifier}
+
+        # Fetch light curve if requested
+        time_arr = None
+        flux_arr = None
+        flux_err_arr = None
+
+        if query.include_light_curve:
+            try:
+                time_arr, flux_arr, flux_err_arr = await loop.run_in_executor(
+                    executor,
+                    fetcher.fetch_light_curve,
+                    query.identifier,
+                    query.mission
+                )
+            except Exception as lc_error:
+                print(f"Warning: Could not fetch light curve: {lc_error}")
+                # Continue without light curve
+
+        # Run prediction
+        if time_arr is not None and flux_arr is not None:
+            # Predict from light curve
+            results = await loop.run_in_executor(
+                executor,
+                predictor.predict_from_light_curve,
+                time_arr, flux_arr, flux_err_arr, True
+            )
+        elif archive_data and ('koi_period' in archive_data or 'toi_period' in archive_data):
+            # Predict from archive features
+            features = {}
+
+            # Map KOI features
+            if 'koi_period' in archive_data:
+                features['period'] = archive_data.get('koi_period', 0)
+                features['duration'] = archive_data.get('koi_duration', 0)
+                features['depth'] = archive_data.get('koi_depth', 0) * 1e6  # Convert to ppm
+                features['star_teff'] = archive_data.get('koi_steff', 5778)
+                features['star_logg'] = archive_data.get('koi_slogg', 4.4)
+                features['star_radius'] = archive_data.get('koi_srad', 1.0)
+            # Map TOI features
+            elif 'toi_period' in archive_data:
+                features['period'] = archive_data.get('toi_period', 0)
+                features['duration'] = archive_data.get('toi_duration', 0)
+                features['depth'] = archive_data.get('toi_depth', 0) * 1e6  # Convert to ppm
+                features['star_teff'] = archive_data.get('st_teff', 5778)
+                features['star_logg'] = archive_data.get('st_logg', 4.4)
+                features['star_radius'] = archive_data.get('st_rad', 1.0)
+
+            # Estimate SNR (simplified)
+            if features.get('depth', 0) > 0:
+                features['snr'] = features['depth'] / 100.0  # Rough estimate
+            else:
+                features['snr'] = 7.0
+
+            results = await loop.run_in_executor(
+                executor,
+                predictor.predict_from_features,
+                features
+            )
+            results['features'] = features
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Insufficient data to make prediction. Archive data incomplete."
+            )
+
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        return PredictionResponse(
+            target=query.identifier,
+            model_probability_candidate=results["model_probability_candidate"],
+            model_label=results["model_label"],
+            confidence=results.get("confidence", "Unknown"),
+            transit_params=results.get("transit_params"),
+            features=results.get("features"),
+            top_features=results.get("top_features"),
+            reasoning=results.get("reasoning"),
+            archive_snapshot=archive_data,
+            model_name=results.get("model_name", model_name),
+            model_version=results.get("model_version", "2.0"),
+            processing_time=processing_time
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Archive prediction failed: {str(e)}")
 
 
 @app.post("/api/predict/batch")
