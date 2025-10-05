@@ -29,7 +29,13 @@ class QueryType(str, Enum):
 class ModelStatus(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
-    TRAINING = "training"
+    EXPIRED = "expired"
+
+
+class TrainingStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
     FAILED = "failed"
 
 
@@ -204,16 +210,15 @@ class QueryAnnotation(Document):
 
 class TrainingJob(Document):
     """Track automated training jobs"""
-    job_id: Indexed(str, unique=True)
     model_name: str
-    status: str  # 'pending', 'running', 'completed', 'failed'
-    started_at: Optional[datetime] = None
+    status: TrainingStatus = TrainingStatus.PENDING
+    started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
-    new_model_version: Optional[str] = None
-    data_count: int = 0
-    metrics: Optional[ModelMetrics] = None
+    model_version: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    organization_id: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
 
     class Settings:
         name = "training_jobs"

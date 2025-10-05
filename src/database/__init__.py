@@ -4,7 +4,7 @@ from .connection import init_db, close_db
 from .schema import (
     User, Organization, Session, Query, ModelVersion,
     CanvasSession, QueryAnnotation, TrainingJob,
-    UserRole, QueryType, ModelStatus, AnnotationLabel
+    UserRole, QueryType, ModelStatus, TrainingStatus, AnnotationLabel
 )
 
 __all__ = [
@@ -21,5 +21,6 @@ __all__ = [
     "UserRole",
     "QueryType",
     "ModelStatus",
+    "TrainingStatus",
     "AnnotationLabel",
 ]

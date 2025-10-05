@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from auth.dependencies import get_current_active_user, require_admin
 from database.schema import User, QueryType
-from logging.query_logger import query_logger
+from query_logging.query_logger import query_logger
 
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])

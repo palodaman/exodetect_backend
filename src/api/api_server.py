@@ -21,8 +21,8 @@ from ml.light_curve_processor import LightCurveProcessor
 from utils.archive_fetcher import ArchiveFetcher
 from database import init_db, close_db
 from api.routes import auth as auth_router
-from logging import query_logger
-from logging.middleware import QueryLoggingMiddleware
+from query_logging import query_logger
+from query_logging.middleware import QueryLoggingMiddleware
 from scheduler import training_scheduler
 
 # Load environment variables
