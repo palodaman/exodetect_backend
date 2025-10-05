@@ -11,6 +11,7 @@ import tempfile
 from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 
 import sys
 import os
@@ -18,12 +19,36 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ml.exoplanet_predictor import ExoplanetPredictor
 from ml.light_curve_processor import LightCurveProcessor
 from utils.archive_fetcher import ArchiveFetcher
+from database import init_db, close_db
+from api.routes import auth as auth_router
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(
     title="ExoDetect API",
-    description="Exoplanet Detection and Classification API",
-    version="2.0.0"
+    description="Exoplanet Detection and Classification API with MongoDB & Authentication",
+    version="3.0.0"
 )
+
+
+# Startup and Shutdown Events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database connection on startup"""
+    try:
+        await init_db()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize database: {e}")
+        print("⚠️  Running without database - authentication and logging disabled")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connection on shutdown"""
+    await close_db()
+    print("Database connection closed")
 
 # CORS configuration for frontend
 app.add_middleware(
@@ -33,6 +58,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include authentication routes
+app.include_router(auth_router.router)
 
 # Thread pool for CPU-intensive tasks
 executor = ThreadPoolExecutor(max_workers=4)

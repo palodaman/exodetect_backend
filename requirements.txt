@@ -16,3 +16,16 @@ fastapi
 uvicorn[standard]
 pydantic
 python-multipart
+
+# MongoDB and async database
+motor>=3.3.2
+beanie>=1.23.6
+pymongo>=4.6.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dotenv>=1.0.0
+
+# Scheduling
+apscheduler>=3.10.4

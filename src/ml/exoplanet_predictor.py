@@ -12,16 +12,19 @@ class ExoplanetPredictor:
     def __init__(self, model_name='xgboost_enhanced', model_dir='models_enhanced'):
         """Initialize predictor with specified model"""
         self.model_name = model_name
-        self.model_dir = model_dir
         self.model = None
         self.scaler = None
         self.feature_names = None
         self.light_curve_processor = LightCurveProcessor()
 
+        # Get absolute path to models directory
+        backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.model_dir = os.path.join(backend_root, model_dir)
+
         # Try enhanced models first, fallback to original
-        if not os.path.exists(model_dir):
-            print(f"Enhanced models not found, using original models...")
-            self.model_dir = 'models'
+        if not os.path.exists(self.model_dir):
+            print(f"Enhanced models not found at {self.model_dir}, using original models...")
+            self.model_dir = os.path.join(backend_root, 'models')
             self.model_name = model_name.replace('_enhanced', '')
 
         self.load_model()
