@@ -29,15 +29,8 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy source code
 COPY src/ ./src/
 
-# Copy models (will be created if not exist)
-COPY models* ./models_temp/ 2>/dev/null || true
-
-# Setup script to handle models
-RUN mkdir -p models models_enhanced data && \
-    if [ -d "models_temp/models" ]; then cp -r models_temp/models/* models/; fi && \
-    if [ -d "models_temp/models_enhanced" ]; then cp -r models_temp/models_enhanced/* models_enhanced/; fi && \
-    if [ -d "models_temp" ] && [ -f "models_temp/*.pkl" ]; then cp models_temp/*.pkl models/; fi && \
-    rm -rf models_temp
+# Create directories for models (will be empty if models don't exist locally)
+RUN mkdir -p models models_enhanced data
 
 # Set environment variables
 ENV PORT=8000
