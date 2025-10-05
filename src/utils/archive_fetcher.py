@@ -7,11 +7,32 @@ import requests
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple, Any
-from astroquery.mast import Observations
-from astroquery.exoplanet_archive import NasaExoplanetArchive
 import warnings
 
 warnings.filterwarnings('ignore')
+
+# Try to import astroquery components
+ASTROQUERY_AVAILABLE = False
+MAST_AVAILABLE = False
+
+try:
+    from astroquery.mast import Observations
+    MAST_AVAILABLE = True
+except ImportError:
+    print("Warning: astroquery.mast not available. Light curve fetching disabled.")
+
+try:
+    # Try new import path (astroquery >= 0.4.6)
+    from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
+    ASTROQUERY_AVAILABLE = True
+except ImportError:
+    try:
+        # Fallback to old import path
+        from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
+        ASTROQUERY_AVAILABLE = True
+    except ImportError:
+        print("Warning: astroquery NASA Exoplanet Archive not available. Using direct API fallback.")
+        NasaExoplanetArchive = None
 
 
 class ArchiveFetcher:
@@ -21,34 +42,39 @@ class ArchiveFetcher:
         self.kepler_koi_table = None
         self.tess_toi_table = None
 
-    def fetch_koi_data(self, koi_id: str) -> Dict[str, Any]:
-        """
-        Fetch KOI (Kepler Object of Interest) data
-
-        Parameters:
-        -----------
-        koi_id : str
-            KOI identifier (e.g., 'K00123.01' or 'KOI-123.01')
-
-        Returns:
-        --------
-        dict : Archive data for the KOI
-        """
+    def _fetch_koi_data_direct(self, koi_id: str) -> Dict[str, Any]:
+        """Fetch KOI data using direct HTTP API"""
         try:
-            # Normalize KOI ID format
+            # NASA TAP service URL
+            url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+
+            # Normalize KOI ID
             koi_id = self._normalize_koi_id(koi_id)
 
-            # Query NASA Exoplanet Archive
-            table = NasaExoplanetArchive.query_criteria(
-                table='cumulative',
-                where=f"kepoi_name like '{koi_id}'"
-            )
+            # Build query
+            query = f"""
+            SELECT kepoi_name, kepid, koi_disposition, koi_pdisposition, koi_score,
+                   koi_period, koi_duration, koi_depth, koi_prad, koi_teq, koi_insol,
+                   koi_steff, koi_slogg, koi_srad,
+                   koi_flag_ntl, koi_flag_ss, koi_flag_co, koi_flag_em
+            FROM cumulative
+            WHERE kepoi_name = '{koi_id}'
+            """
 
-            if len(table) == 0:
+            params = {
+                'query': query,
+                'format': 'json'
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+
+            if not data or len(data) == 0:
                 raise ValueError(f"KOI {koi_id} not found in archive")
 
-            # Get first match
-            row = table[0]
+            row = data[0]
 
             # Extract relevant fields
             archive_data = {
@@ -70,16 +96,82 @@ class ArchiveFetcher:
 
             # Vetting flags
             archive_data['vetting_flags'] = {
-                'ntl': bool(row.get('koi_flag_ntl', False)),  # Not transit-like
-                'ss': bool(row.get('koi_flag_ss', False)),    # Stellar eclipse
-                'co': bool(row.get('koi_flag_co', False)),    # Centroid offset
-                'em': bool(row.get('koi_flag_em', False))     # Ephemeris match
+                'ntl': bool(row.get('koi_flag_ntl', 0)),
+                'ss': bool(row.get('koi_flag_ss', 0)),
+                'co': bool(row.get('koi_flag_co', 0)),
+                'em': bool(row.get('koi_flag_em', 0))
             }
 
             return archive_data
 
         except Exception as e:
             raise ValueError(f"Error fetching KOI data: {str(e)}")
+
+    def fetch_koi_data(self, koi_id: str) -> Dict[str, Any]:
+        """
+        Fetch KOI (Kepler Object of Interest) data
+
+        Parameters:
+        -----------
+        koi_id : str
+            KOI identifier (e.g., 'K00123.01' or 'KOI-123.01')
+
+        Returns:
+        --------
+        dict : Archive data for the KOI
+        """
+        # Try astroquery first, fallback to direct API
+        if ASTROQUERY_AVAILABLE and NasaExoplanetArchive is not None:
+            try:
+                # Normalize KOI ID format
+                koi_id = self._normalize_koi_id(koi_id)
+
+                # Query NASA Exoplanet Archive
+                table = NasaExoplanetArchive.query_criteria(
+                    table='cumulative',
+                    where=f"kepoi_name like '{koi_id}'"
+                )
+
+                if len(table) == 0:
+                    raise ValueError(f"KOI {koi_id} not found in archive")
+
+                # Get first match
+                row = table[0]
+
+                # Extract relevant fields
+                archive_data = {
+                    'kepoi_name': str(row.get('kepoi_name', koi_id)),
+                    'kepid': int(row.get('kepid', 0)) if row.get('kepid') else None,
+                    'koi_disposition': str(row.get('koi_disposition', 'UNKNOWN')),
+                    'koi_pdisposition': str(row.get('koi_pdisposition', 'UNKNOWN')),
+                    'koi_score': float(row.get('koi_score', 0.0)) if row.get('koi_score') else None,
+                    'koi_period': float(row.get('koi_period', 0.0)) if row.get('koi_period') else None,
+                    'koi_duration': float(row.get('koi_duration', 0.0)) if row.get('koi_duration') else None,
+                    'koi_depth': float(row.get('koi_depth', 0.0)) if row.get('koi_depth') else None,
+                    'koi_prad': float(row.get('koi_prad', 0.0)) if row.get('koi_prad') else None,
+                    'koi_teq': float(row.get('koi_teq', 0.0)) if row.get('koi_teq') else None,
+                    'koi_insol': float(row.get('koi_insol', 0.0)) if row.get('koi_insol') else None,
+                    'koi_steff': float(row.get('koi_steff', 0.0)) if row.get('koi_steff') else None,
+                    'koi_slogg': float(row.get('koi_slogg', 0.0)) if row.get('koi_slogg') else None,
+                    'koi_srad': float(row.get('koi_srad', 0.0)) if row.get('koi_srad') else None,
+                }
+
+                # Vetting flags
+                archive_data['vetting_flags'] = {
+                    'ntl': bool(row.get('koi_flag_ntl', False)),
+                    'ss': bool(row.get('koi_flag_ss', False)),
+                    'co': bool(row.get('koi_flag_co', False)),
+                    'em': bool(row.get('koi_flag_em', False))
+                }
+
+                return archive_data
+
+            except Exception as e:
+                print(f"Astroquery failed, trying direct API: {e}")
+                return self._fetch_koi_data_direct(koi_id)
+        else:
+            # Use direct API fallback
+            return self._fetch_koi_data_direct(koi_id)
 
     def fetch_toi_data(self, toi_id: str) -> Dict[str, Any]:
         """
@@ -142,6 +234,9 @@ class ArchiveFetcher:
         --------
         tuple : (time, flux, flux_err) arrays
         """
+        if not MAST_AVAILABLE:
+            raise ValueError("Light curve fetching requires astroquery.mast. Please install: pip install astroquery")
+
         try:
             # Determine target ID
             target_id = self._parse_identifier(identifier, mission)
