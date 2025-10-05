@@ -10,11 +10,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 
-# Add scripts to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts'))
-
-from retrain_model import IncrementalModelTrainer
-
 
 class TrainingScheduler:
     """Scheduler for automated model retraining"""
@@ -41,6 +36,11 @@ class TrainingScheduler:
         print(f"\n{'='*70}")
         print(f"🤖 Automated Retraining Started - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*70}\n")
+
+        # Import here to avoid module load issues
+        scripts_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts')
+        sys.path.insert(0, scripts_path)
+        from retrain_model import IncrementalModelTrainer
 
         trainer = IncrementalModelTrainer()
 
@@ -122,6 +122,11 @@ class TrainingScheduler:
         print(f"\n{'='*70}")
         print(f"🔄 Weekly Full Retraining - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*70}\n")
+
+        # Import here to avoid module load issues
+        scripts_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts')
+        sys.path.insert(0, scripts_path)
+        from retrain_model import IncrementalModelTrainer
 
         trainer = IncrementalModelTrainer()
 
