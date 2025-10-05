@@ -21,6 +21,9 @@ from ml.light_curve_processor import LightCurveProcessor
 from utils.archive_fetcher import ArchiveFetcher
 from database import init_db, close_db
 from api.routes import auth as auth_router
+from logging import query_logger
+from logging.middleware import QueryLoggingMiddleware
+from scheduler import training_scheduler
 
 # Load environment variables
 load_dotenv()
@@ -35,7 +38,7 @@ app = FastAPI(
 # Startup and Shutdown Events
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database connection on startup"""
+    """Initialize database connection, query logger, and scheduler on startup"""
     try:
         await init_db()
         print("✅ Database initialized successfully")
@@ -43,10 +46,38 @@ async def startup_event():
         print(f"❌ Failed to initialize database: {e}")
         print("⚠️  Running without database - authentication and logging disabled")
 
+    # Start query logger
+    try:
+        await query_logger.start()
+    except Exception as e:
+        print(f"⚠️  Failed to start query logger: {e}")
+
+    # Start training scheduler (only in production)
+    enable_scheduler = os.getenv("ENABLE_SCHEDULER", "false").lower() == "true"
+    if enable_scheduler:
+        try:
+            training_scheduler.start()
+        except Exception as e:
+            print(f"⚠️  Failed to start training scheduler: {e}")
+    else:
+        print("ℹ️  Training scheduler disabled (set ENABLE_SCHEDULER=true to enable)")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close database connection on shutdown"""
+    """Close database connection, query logger, and scheduler on shutdown"""
+    # Stop training scheduler
+    try:
+        training_scheduler.stop()
+    except Exception as e:
+        print(f"⚠️  Failed to stop training scheduler: {e}")
+
+    # Stop query logger
+    try:
+        await query_logger.stop()
+    except Exception as e:
+        print(f"⚠️  Failed to stop query logger: {e}")
+
     await close_db()
     print("Database connection closed")
 
@@ -59,8 +90,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add query logging middleware
+app.add_middleware(QueryLoggingMiddleware)
+
 # Include authentication routes
 app.include_router(auth_router.router)
+
+# Include analytics routes
+from api.routes import analytics as analytics_router
+app.include_router(analytics_router.router)
+
+# Include model management routes
+from api.routes import models as models_router
+app.include_router(models_router.router)
 
 # Thread pool for CPU-intensive tasks
 executor = ThreadPoolExecutor(max_workers=4)

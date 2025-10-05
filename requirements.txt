@@ -14,8 +14,9 @@ imbalanced-learn
 shap
 fastapi
 uvicorn[standard]
-pydantic
+pydantic[email]
 python-multipart
+email-validator
 
 # MongoDB and async database
 motor>=3.3.2
