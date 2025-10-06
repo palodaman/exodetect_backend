@@ -60,31 +60,55 @@ class ArchiveFetcher:
             }
 
             response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
 
-            data = response.json()
+            # Check for errors
+            if response.status_code != 200:
+                error_text = response.text[:200]  # First 200 chars of error
+                raise ValueError(f"NASA API returned {response.status_code}: {error_text}")
+
+            try:
+                data = response.json()
+            except Exception as e:
+                raise ValueError(f"Failed to parse NASA response: {str(e)}")
 
             if not data or len(data) == 0:
-                raise ValueError(f"KOI {koi_id} not found in archive")
+                raise ValueError(f"KOI {koi_id} not found in archive. Query: {query}")
 
             row = data[0]
+
+            # Helper to safely convert values
+            def safe_float(val, default=None):
+                if val is None or val == '':
+                    return default
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return default
+
+            def safe_int(val, default=None):
+                if val is None or val == '':
+                    return default
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return default
 
             # Extract relevant fields
             archive_data = {
                 'kepoi_name': str(row.get('kepoi_name', koi_id)),
-                'kepid': int(row.get('kepid', 0)) if row.get('kepid') else None,
-                'koi_disposition': str(row.get('koi_disposition', 'UNKNOWN')),
-                'koi_pdisposition': str(row.get('koi_pdisposition', 'UNKNOWN')),
-                'koi_score': float(row.get('koi_score', 0.0)) if row.get('koi_score') else None,
-                'koi_period': float(row.get('koi_period', 0.0)) if row.get('koi_period') else None,
-                'koi_duration': float(row.get('koi_duration', 0.0)) if row.get('koi_duration') else None,
-                'koi_depth': float(row.get('koi_depth', 0.0)) if row.get('koi_depth') else None,
-                'koi_prad': float(row.get('koi_prad', 0.0)) if row.get('koi_prad') else None,
-                'koi_teq': float(row.get('koi_teq', 0.0)) if row.get('koi_teq') else None,
-                'koi_insol': float(row.get('koi_insol', 0.0)) if row.get('koi_insol') else None,
-                'koi_steff': float(row.get('koi_steff', 0.0)) if row.get('koi_steff') else None,
-                'koi_slogg': float(row.get('koi_slogg', 0.0)) if row.get('koi_slogg') else None,
-                'koi_srad': float(row.get('koi_srad', 0.0)) if row.get('koi_srad') else None,
+                'kepid': safe_int(row.get('kepid')),
+                'koi_disposition': str(row.get('koi_disposition') or 'UNKNOWN'),
+                'koi_pdisposition': str(row.get('koi_pdisposition') or 'UNKNOWN'),
+                'koi_score': safe_float(row.get('koi_score')),
+                'koi_period': safe_float(row.get('koi_period')),
+                'koi_duration': safe_float(row.get('koi_duration')),
+                'koi_depth': safe_float(row.get('koi_depth')),
+                'koi_prad': safe_float(row.get('koi_prad')),
+                'koi_teq': safe_float(row.get('koi_teq')),
+                'koi_insol': safe_float(row.get('koi_insol')),
+                'koi_steff': safe_float(row.get('koi_steff')),
+                'koi_slogg': safe_float(row.get('koi_slogg')),
+                'koi_srad': safe_float(row.get('koi_srad')),
             }
 
             # Vetting flags
