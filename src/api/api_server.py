@@ -124,6 +124,22 @@ def get_archive_fetcher():
         archive_fetcher = ArchiveFetcher()
     return archive_fetcher
 
+def convert_numpy_to_python(obj):
+    """Recursively convert numpy types to Python native types for JSON serialization"""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_to_python(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_python(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_to_python(item) for item in obj)
+    return obj
+
 
 # Request/Response Models
 class LightCurveData(BaseModel):
@@ -279,6 +295,9 @@ async def predict_from_light_curve(data: LightCurveData, model_name: str = "xgbo
 
         processing_time = (datetime.now() - start_time).total_seconds()
 
+        # Convert numpy arrays to Python types
+        results = convert_numpy_to_python(results)
+
         return PredictionResponse(
             target="uploaded_light_curve",
             model_probability_candidate=results["model_probability_candidate"],
@@ -317,6 +336,9 @@ async def predict_from_features(data: FeatureData, model_name: str = "xgboost_en
         )
 
         processing_time = (datetime.now() - start_time).total_seconds()
+
+        # Convert numpy arrays to Python types
+        results = convert_numpy_to_python(results)
 
         return PredictionResponse(
             target="feature_input",
@@ -368,6 +390,9 @@ async def predict_from_upload(
 
         processing_time = (datetime.now() - start_time).total_seconds()
 
+        # Convert numpy arrays to Python types
+        results = convert_numpy_to_python(results)
+
         return PredictionResponse(
             target=file.filename,
             model_probability_candidate=results["model_probability_candidate"],
@@ -375,8 +400,10 @@ async def predict_from_upload(
             confidence=results["confidence"],
             transit_params=results.get("transit_params"),
             features=results.get("features"),
-            model_name=model_name,
-            model_version="2.0",
+            top_features=results.get("top_features"),
+            reasoning=results.get("reasoning"),
+            model_name=results.get("model_name", model_name),
+            model_version=results.get("model_version", "2.0"),
             processing_time=processing_time
         )
 
@@ -483,6 +510,10 @@ async def predict_from_archive(query: ArchiveQuery, model_name: str = "xgboost_e
             )
 
         processing_time = (datetime.now() - start_time).total_seconds()
+
+        # Convert numpy arrays to Python types
+        results = convert_numpy_to_python(results)
+        archive_data = convert_numpy_to_python(archive_data)
 
         return PredictionResponse(
             target=query.identifier,

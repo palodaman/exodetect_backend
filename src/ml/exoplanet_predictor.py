@@ -138,7 +138,7 @@ class ExoplanetPredictor:
                     reverse=True
                 )[:5]
                 results['top_features'] = [
-                    {'feature': name, 'importance': float(imp)}
+                    {name: float(imp)}
                     for name, imp in feature_importance
                 ]
 
@@ -178,8 +178,26 @@ class ExoplanetPredictor:
             'model_label': 'Likely Candidate' if probability >= 0.5 else 'Likely False Positive',
             'confidence': self._calculate_confidence(probability),
             'transit_params': transit_params,
-            'features': features
+            'features': features,
+            'model_name': self.model_name,
+            'model_version': 'enhanced_v2.0'
         }
+
+        # Add feature importance if available
+        if hasattr(self.model, 'feature_importances_'):
+            importances = self.model.feature_importances_
+            feature_importance = sorted(
+                zip(self.feature_names, importances),
+                key=lambda x: x[1],
+                reverse=True
+            )[:5]
+            results['top_features'] = [
+                {name: float(imp)}
+                for name, imp in feature_importance
+            ]
+
+        # Add reasoning
+        results['reasoning'] = self._generate_reasoning(features, probability)
 
         return results
 
