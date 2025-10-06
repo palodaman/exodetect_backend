@@ -51,15 +51,8 @@ class ArchiveFetcher:
             # Normalize KOI ID
             koi_id = self._normalize_koi_id(koi_id)
 
-            # Build query
-            query = f"""
-            SELECT kepoi_name, kepid, koi_disposition, koi_pdisposition, koi_score,
-                   koi_period, koi_duration, koi_depth, koi_prad, koi_teq, koi_insol,
-                   koi_steff, koi_slogg, koi_srad,
-                   koi_flag_ntl, koi_flag_ss, koi_flag_co, koi_flag_em
-            FROM cumulative
-            WHERE kepoi_name = '{koi_id}'
-            """
+            # Build query (single line to avoid whitespace issues)
+            query = f"SELECT kepoi_name, kepid, koi_disposition, koi_pdisposition, koi_score, koi_period, koi_duration, koi_depth, koi_prad, koi_teq, koi_insol, koi_steff, koi_slogg, koi_srad, koi_flag_ntl, koi_flag_ss, koi_flag_co, koi_flag_em FROM cumulative WHERE kepoi_name = '{koi_id}'"
 
             params = {
                 'query': query,
