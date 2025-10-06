@@ -52,7 +52,8 @@ class ArchiveFetcher:
             koi_id = self._normalize_koi_id(koi_id)
 
             # Build query (single line to avoid whitespace issues)
-            query = f"SELECT kepoi_name, kepid, koi_disposition, koi_pdisposition, koi_score, koi_period, koi_duration, koi_depth, koi_prad, koi_teq, koi_insol, koi_steff, koi_slogg, koi_srad, koi_flag_ntl, koi_flag_ss, koi_flag_co, koi_flag_em FROM cumulative WHERE kepoi_name = '{koi_id}'"
+            # Note: Using koi_fpflag_* (false positive flags) not koi_flag_*
+            query = f"SELECT kepoi_name, kepid, koi_disposition, koi_pdisposition, koi_score, koi_period, koi_duration, koi_depth, koi_prad, koi_teq, koi_insol, koi_steff, koi_slogg, koi_srad, koi_fpflag_nt, koi_fpflag_ss, koi_fpflag_co, koi_fpflag_ec FROM cumulative WHERE kepoi_name = '{koi_id}'"
 
             params = {
                 'query': query,
@@ -111,12 +112,12 @@ class ArchiveFetcher:
                 'koi_srad': safe_float(row.get('koi_srad')),
             }
 
-            # Vetting flags
+            # False positive flags (vetting flags)
             archive_data['vetting_flags'] = {
-                'ntl': bool(row.get('koi_flag_ntl', 0)),
-                'ss': bool(row.get('koi_flag_ss', 0)),
-                'co': bool(row.get('koi_flag_co', 0)),
-                'em': bool(row.get('koi_flag_em', 0))
+                'not_transit_like': bool(row.get('koi_fpflag_nt', 0)),
+                'stellar_eclipse': bool(row.get('koi_fpflag_ss', 0)),
+                'centroid_offset': bool(row.get('koi_fpflag_co', 0)),
+                'ephemeris_match': bool(row.get('koi_fpflag_ec', 0))
             }
 
             return archive_data
