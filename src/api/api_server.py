@@ -427,7 +427,7 @@ async def predict_from_archive(query: ArchiveQuery, model_name: str = "xgboost_e
         identifier_upper = query.identifier.upper()
         archive_data = None
 
-        if 'KOI' in identifier_upper or 'K' == identifier_upper[0]:
+        if 'KOI' in identifier_upper or ('K' == identifier_upper[0] and not 'KIC' in identifier_upper):
             # Fetch KOI data
             archive_data = await loop.run_in_executor(
                 executor,
@@ -442,8 +442,11 @@ async def predict_from_archive(query: ArchiveQuery, model_name: str = "xgboost_e
                 query.identifier
             )
         else:
-            # Generic identifier (KIC, TIC, EPIC)
+            # Generic identifier (KIC, TIC, EPIC) - try to fetch light curve
             archive_data = {"identifier": query.identifier}
+            # Force light curve fetch for KIC/TIC/EPIC
+            if not query.include_light_curve:
+                query.include_light_curve = True
 
         # Fetch light curve if requested
         time_arr = None
@@ -504,9 +507,18 @@ async def predict_from_archive(query: ArchiveQuery, model_name: str = "xgboost_e
             )
             results['features'] = features
         else:
+            # Provide helpful error message
+            error_msg = f"No prediction data available for {query.identifier}. "
+            if 'KIC' in identifier_upper or 'EPIC' in identifier_upper or 'TIC' in identifier_upper:
+                error_msg += "This target does not have archived transit parameters (KOI/TOI), and light curve data could not be fetched from MAST. "
+                error_msg += "This could mean: (1) No light curve data available, (2) Target not found in MAST, or (3) Network/MAST issues. "
+                error_msg += "Try a KOI instead (e.g., 'KOI-7.01'), or upload a light curve file directly."
+            else:
+                error_msg += "Archive parameters not found and light curve unavailable."
+
             raise HTTPException(
-                status_code=400,
-                detail="Insufficient data to make prediction. Archive data incomplete."
+                status_code=404,
+                detail=error_msg
             )
 
         processing_time = (datetime.now() - start_time).total_seconds()
