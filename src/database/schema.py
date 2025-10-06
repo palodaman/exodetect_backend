@@ -121,20 +121,21 @@ class Session(Document):
 
 class Query(Document):
     """Logged user query for model predictions"""
-    user_id: Indexed(str)
+    user_id: Optional[str] = None  # Optional for non-authenticated requests
     session_id: Optional[str] = None
-    organization_id: Optional[Indexed(str)] = None
+    organization_id: Optional[str] = None
     query_type: QueryType
     target_id: Optional[str] = None
     mission: Optional[str] = None
     input_data: Dict[str, Any] = {}
     prediction_result: Dict[str, Any] = {}
-    model_version: Indexed(str)
-    processing_time: float
+    model_version: str
+    processing_time_ms: float  # Changed from processing_time to match middleware
     created_at: Indexed(datetime) = Field(default_factory=datetime.utcnow)
     used_for_training: bool = False
     feedback_score: Optional[int] = None  # 1-5 stars
     feedback_comment: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None  # Additional metadata like IP, user agent
 
     class Settings:
         name = "queries"

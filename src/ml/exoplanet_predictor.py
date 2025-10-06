@@ -46,9 +46,21 @@ class ExoplanetPredictor:
             # List available models if directory exists
             available_models = []
             if os.path.exists(self.model_dir):
+                print(f"   Files in {self.model_dir}:")
+                for f in os.listdir(self.model_dir):
+                    print(f"      - {f}")
+
                 available_models = [f.replace('_model.pkl', '')
                                   for f in os.listdir(self.model_dir)
                                   if f.endswith('_model.pkl')]
+
+            # Also check if models directory exists
+            alt_model_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'models')
+            if os.path.exists(alt_model_dir):
+                print(f"   Files in {alt_model_dir}:")
+                for f in os.listdir(alt_model_dir):
+                    if f.endswith('.pkl'):
+                        print(f"      - {f}")
 
             raise ValueError(f"Model {self.model_name} not found. Available: {available_models}")
 

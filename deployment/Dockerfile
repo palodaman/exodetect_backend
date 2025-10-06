@@ -29,8 +29,12 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy source code
 COPY src/ ./src/
 
-# Create directories for models (will be empty if models don't exist locally)
-RUN mkdir -p models models_enhanced data
+# Copy model files (CRITICAL for predictions to work!)
+COPY models/ ./models/
+COPY models_enhanced/ ./models_enhanced/
+
+# Create data directory
+RUN mkdir -p data
 
 # Set environment variables
 ENV PORT=8000
