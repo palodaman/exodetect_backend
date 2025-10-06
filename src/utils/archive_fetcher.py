@@ -156,30 +156,54 @@ class ArchiveFetcher:
                 # Get first match
                 row = table[0]
 
+                # Helper function to safely extract values from MaskedColumn
+                def safe_extract(row, key, dtype=None, default=None):
+                    try:
+                        val = row[key]
+                        # Check if masked
+                        if hasattr(val, 'mask') and val.mask:
+                            return default
+                        # Convert to appropriate type
+                        if dtype == 'int':
+                            return int(val) if val is not None else default
+                        elif dtype == 'float':
+                            return float(val) if val is not None else default
+                        elif dtype == 'str':
+                            return str(val) if val is not None else default
+                        elif dtype == 'bool':
+                            # Safely convert to bool
+                            if val is None:
+                                return default
+                            return bool(int(val)) if str(val).isdigit() else bool(val)
+                        else:
+                            return val if val is not None else default
+                    except (KeyError, ValueError, TypeError):
+                        return default
+
                 # Extract relevant fields
                 archive_data = {
-                    'kepoi_name': str(row.get('kepoi_name', koi_id)),
-                    'kepid': int(row.get('kepid', 0)) if row.get('kepid') else None,
-                    'koi_disposition': str(row.get('koi_disposition', 'UNKNOWN')),
-                    'koi_pdisposition': str(row.get('koi_pdisposition', 'UNKNOWN')),
-                    'koi_score': float(row.get('koi_score', 0.0)) if row.get('koi_score') else None,
-                    'koi_period': float(row.get('koi_period', 0.0)) if row.get('koi_period') else None,
-                    'koi_duration': float(row.get('koi_duration', 0.0)) if row.get('koi_duration') else None,
-                    'koi_depth': float(row.get('koi_depth', 0.0)) if row.get('koi_depth') else None,
-                    'koi_prad': float(row.get('koi_prad', 0.0)) if row.get('koi_prad') else None,
-                    'koi_teq': float(row.get('koi_teq', 0.0)) if row.get('koi_teq') else None,
-                    'koi_insol': float(row.get('koi_insol', 0.0)) if row.get('koi_insol') else None,
-                    'koi_steff': float(row.get('koi_steff', 0.0)) if row.get('koi_steff') else None,
-                    'koi_slogg': float(row.get('koi_slogg', 0.0)) if row.get('koi_slogg') else None,
-                    'koi_srad': float(row.get('koi_srad', 0.0)) if row.get('koi_srad') else None,
+                    'kepoi_name': safe_extract(row, 'kepoi_name', 'str', koi_id),
+                    'kepid': safe_extract(row, 'kepid', 'int'),
+                    'koi_disposition': safe_extract(row, 'koi_disposition', 'str', 'UNKNOWN'),
+                    'koi_pdisposition': safe_extract(row, 'koi_pdisposition', 'str', 'UNKNOWN'),
+                    'koi_score': safe_extract(row, 'koi_score', 'float'),
+                    'koi_period': safe_extract(row, 'koi_period', 'float'),
+                    'koi_duration': safe_extract(row, 'koi_duration', 'float'),
+                    'koi_depth': safe_extract(row, 'koi_depth', 'float'),
+                    'koi_prad': safe_extract(row, 'koi_prad', 'float'),
+                    'koi_teq': safe_extract(row, 'koi_teq', 'float'),
+                    'koi_insol': safe_extract(row, 'koi_insol', 'float'),
+                    'koi_steff': safe_extract(row, 'koi_steff', 'float'),
+                    'koi_slogg': safe_extract(row, 'koi_slogg', 'float'),
+                    'koi_srad': safe_extract(row, 'koi_srad', 'float'),
                 }
 
-                # Vetting flags
+                # Vetting flags (try both flag names)
                 archive_data['vetting_flags'] = {
-                    'ntl': bool(row.get('koi_flag_ntl', False)),
-                    'ss': bool(row.get('koi_flag_ss', False)),
-                    'co': bool(row.get('koi_flag_co', False)),
-                    'em': bool(row.get('koi_flag_em', False))
+                    'ntl': safe_extract(row, 'koi_fpflag_nt', 'bool', False) or safe_extract(row, 'koi_flag_ntl', 'bool', False),
+                    'ss': safe_extract(row, 'koi_fpflag_ss', 'bool', False) or safe_extract(row, 'koi_flag_ss', 'bool', False),
+                    'co': safe_extract(row, 'koi_fpflag_co', 'bool', False) or safe_extract(row, 'koi_flag_co', 'bool', False),
+                    'em': safe_extract(row, 'koi_fpflag_ec', 'bool', False) or safe_extract(row, 'koi_flag_em', 'bool', False)
                 }
 
                 return archive_data
